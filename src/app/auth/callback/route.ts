@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
+import { checkOnboardingStatus, getRedirectPath } from '@/lib/onboarding'
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
@@ -36,26 +37,9 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     
     if (user) {
-      // Check if user profile exists and is complete
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('full_name, phone_number')
-        .eq('id', user.id)
-        .single()
-
-      // Check if user has a company
-      const { data: company } = await supabase
-        .from('companies')
-        .select('id')
-        .eq('owner_id', user.id)
-        .single()
-
-      // Redirect to appropriate page based on onboarding status
-      if (!profile || !profile.full_name || !company) {
-        return NextResponse.redirect(`${requestUrl.origin}/welcome`)
-      } else {
-        return NextResponse.redirect(`${requestUrl.origin}/dashboard`)
-      }
+      const onboardingStatus = await checkOnboardingStatus(user.id)
+      const redirectPath = getRedirectPath(onboardingStatus)
+      return NextResponse.redirect(`${requestUrl.origin}${redirectPath}`)
     }
   }
 

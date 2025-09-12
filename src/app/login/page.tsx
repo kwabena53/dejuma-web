@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
+import { supabase } from '@/lib/supabase'
+import { checkOnboardingStatus, getRedirectPath } from '@/lib/onboarding'
 import { Eye, EyeOff, Mail, Lock, Hammer } from 'lucide-react'
 
 export default function LoginPage() {
@@ -12,7 +14,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const { signIn, signInWithGoogle } = useAuth()
+  const { signIn, signInWithGoogle, user } = useAuth()
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -26,7 +28,24 @@ export default function LoginPage() {
       setError(error.message)
       setLoading(false)
     } else {
-      router.push('/dashboard')
+      // Check onboarding status and redirect accordingly
+      if (user) {
+        const onboardingStatus = await checkOnboardingStatus(user.id)
+        const redirectPath = getRedirectPath(onboardingStatus)
+        router.push(redirectPath)
+      } else {
+        // Wait a moment for user to be set, then check again
+        setTimeout(async () => {
+          const { data: { user: currentUser } } = await supabase.auth.getUser()
+          if (currentUser) {
+            const onboardingStatus = await checkOnboardingStatus(currentUser.id)
+            const redirectPath = getRedirectPath(onboardingStatus)
+            router.push(redirectPath)
+          } else {
+            router.push('/dashboard') // fallback
+          }
+        }, 100)
+      }
     }
   }
 

@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { LogOut, Plus, FileText, DollarSign, Briefcase, User, Settings } from 'lucide-react'
@@ -159,13 +160,13 @@ export default function DashboardPage() {
                       </div>
                     </button>
                     
-                    <button className="flex items-center p-4 text-left border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                    <Link href="/clients/add" className="flex items-center p-4 text-left border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                       <User className="h-5 w-5 text-orange-600 mr-3" />
                       <div>
                         <div className="font-medium text-gray-900">Add Client</div>
                         <div className="text-sm text-gray-500">Manage your client database</div>
                       </div>
-                    </button>
+                    </Link>
                   </div>
                 </div>
               </div>

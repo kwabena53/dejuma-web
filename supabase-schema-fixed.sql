@@ -1,5 +1,17 @@
--- User profiles table to store additional user information
-CREATE TABLE user_profiles (
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Users can view companies they own or work for" ON companies;
+DROP POLICY IF EXISTS "Users can update companies they own" ON companies;
+DROP POLICY IF EXISTS "Users can insert companies" ON companies;
+DROP POLICY IF EXISTS "Users can delete companies they own" ON companies;
+DROP POLICY IF EXISTS "Company owners can manage employees" ON company_employees;
+DROP POLICY IF EXISTS "Users can view employees of companies they own or work for" ON company_employees;
+DROP POLICY IF EXISTS "Users can view clients from their company" ON clients;
+DROP POLICY IF EXISTS "Users can insert clients for their company" ON clients;
+DROP POLICY IF EXISTS "Users can update clients from their company" ON clients;
+DROP POLICY IF EXISTS "Users can delete clients from their company" ON clients;
+
+-- Create tables (if they don't exist)
+CREATE TABLE IF NOT EXISTS user_profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   full_name TEXT,
   phone_number TEXT,
@@ -7,8 +19,7 @@ CREATE TABLE user_profiles (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Companies table to store company information
-CREATE TABLE companies (
+CREATE TABLE IF NOT EXISTS companies (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
   address TEXT,
@@ -20,8 +31,7 @@ CREATE TABLE companies (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Company employees table (for future use)
-CREATE TABLE company_employees (
+CREATE TABLE IF NOT EXISTS company_employees (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   company_id UUID REFERENCES companies(id) ON DELETE CASCADE NOT NULL,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
@@ -30,8 +40,7 @@ CREATE TABLE company_employees (
   UNIQUE(company_id, user_id)
 );
 
--- Clients table to store client information
-CREATE TABLE clients (
+CREATE TABLE IF NOT EXISTS clients (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   first_name TEXT NOT NULL,
   last_name TEXT NOT NULL,
@@ -45,13 +54,13 @@ CREATE TABLE clients (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Row Level Security (RLS) policies
+-- Enable RLS
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE company_employees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE clients ENABLE ROW LEVEL SECURITY;
 
--- Policies for user_profiles
+-- Simple RLS policies for user_profiles (no recursion risk)
 CREATE POLICY "Users can view their own profile" ON user_profiles
   FOR SELECT USING (auth.uid() = id);
 
@@ -61,40 +70,51 @@ CREATE POLICY "Users can update their own profile" ON user_profiles
 CREATE POLICY "Users can insert their own profile" ON user_profiles
   FOR INSERT WITH CHECK (auth.uid() = id);
 
--- Policies for companies
-CREATE POLICY "Users can view companies they own or work for" ON companies
-  FOR SELECT USING (
-    auth.uid() = owner_id OR 
-    EXISTS (
-      SELECT 1 FROM company_employees 
-      WHERE company_id = companies.id AND user_id = auth.uid()
-    )
-  );
+-- Simple RLS policies for companies (owner-only access to avoid recursion)
+CREATE POLICY "Users can view companies they own" ON companies
+  FOR SELECT USING (auth.uid() = owner_id);
+
+CREATE POLICY "Users can insert companies they own" ON companies
+  FOR INSERT WITH CHECK (auth.uid() = owner_id);
 
 CREATE POLICY "Users can update companies they own" ON companies
   FOR UPDATE USING (auth.uid() = owner_id);
 
-CREATE POLICY "Users can insert companies" ON companies
-  FOR INSERT WITH CHECK (auth.uid() = owner_id);
-
 CREATE POLICY "Users can delete companies they own" ON companies
   FOR DELETE USING (auth.uid() = owner_id);
 
--- Policies for company_employees
-CREATE POLICY "Users can view employees of companies they own or work for" ON company_employees
+-- Simple RLS policies for company_employees
+CREATE POLICY "Users can view company employees" ON company_employees
   FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM companies 
-      WHERE id = company_id AND owner_id = auth.uid()
-    ) OR user_id = auth.uid()
+    user_id = auth.uid() OR 
+    EXISTS (SELECT 1 FROM companies WHERE id = company_id AND owner_id = auth.uid())
   );
 
 CREATE POLICY "Company owners can manage employees" ON company_employees
   FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM companies 
-      WHERE id = company_id AND owner_id = auth.uid()
-    )
+    EXISTS (SELECT 1 FROM companies WHERE id = company_id AND owner_id = auth.uid())
+  );
+
+-- Simple RLS policies for clients (owner-only to avoid recursion)
+CREATE POLICY "Users can view their company clients" ON clients
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM companies WHERE id = company_id AND owner_id = auth.uid())
+  );
+
+CREATE POLICY "Users can insert clients for their company" ON clients
+  FOR INSERT WITH CHECK (
+    EXISTS (SELECT 1 FROM companies WHERE id = company_id AND owner_id = auth.uid()) 
+    AND created_by = auth.uid()
+  );
+
+CREATE POLICY "Users can update their company clients" ON clients
+  FOR UPDATE USING (
+    EXISTS (SELECT 1 FROM companies WHERE id = company_id AND owner_id = auth.uid())
+  );
+
+CREATE POLICY "Users can delete their company clients" ON clients
+  FOR DELETE USING (
+    EXISTS (SELECT 1 FROM companies WHERE id = company_id AND owner_id = auth.uid())
   );
 
 -- Function to automatically create user profile on signup
@@ -108,6 +128,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Trigger to create user profile when new user signs up
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
@@ -121,64 +142,18 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Policies for clients
-CREATE POLICY "Users can view clients from their company" ON clients
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM companies 
-      WHERE companies.id = clients.company_id AND owner_id = auth.uid()
-    ) OR
-    EXISTS (
-      SELECT 1 FROM company_employees 
-      WHERE company_id = clients.company_id AND user_id = auth.uid()
-    )
-  );
-
-CREATE POLICY "Users can insert clients for their company" ON clients
-  FOR INSERT WITH CHECK (
-    (EXISTS (
-      SELECT 1 FROM companies 
-      WHERE companies.id = clients.company_id AND owner_id = auth.uid()
-    ) OR
-    EXISTS (
-      SELECT 1 FROM company_employees 
-      WHERE company_id = clients.company_id AND user_id = auth.uid()
-    )) AND created_by = auth.uid()
-  );
-
-CREATE POLICY "Users can update clients from their company" ON clients
-  FOR UPDATE USING (
-    EXISTS (
-      SELECT 1 FROM companies 
-      WHERE companies.id = clients.company_id AND owner_id = auth.uid()
-    ) OR
-    EXISTS (
-      SELECT 1 FROM company_employees 
-      WHERE company_id = clients.company_id AND user_id = auth.uid()
-    )
-  );
-
-CREATE POLICY "Users can delete clients from their company" ON clients
-  FOR DELETE USING (
-    EXISTS (
-      SELECT 1 FROM companies 
-      WHERE companies.id = clients.company_id AND owner_id = auth.uid()
-    ) OR
-    EXISTS (
-      SELECT 1 FROM company_employees 
-      WHERE company_id = clients.company_id AND user_id = auth.uid()
-    )
-  );
-
 -- Triggers to update updated_at timestamps
+DROP TRIGGER IF EXISTS update_user_profiles_updated_at ON user_profiles;
 CREATE TRIGGER update_user_profiles_updated_at
   BEFORE UPDATE ON user_profiles
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_companies_updated_at ON companies;
 CREATE TRIGGER update_companies_updated_at
   BEFORE UPDATE ON companies
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_clients_updated_at ON clients;
 CREATE TRIGGER update_clients_updated_at
   BEFORE UPDATE ON clients
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

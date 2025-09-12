@@ -23,7 +23,7 @@ export default function WelcomePage() {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const { user } = useAuth()
+  const { user, checkOnboarding } = useAuth()
   const router = useRouter()
 
   // User profile state
@@ -103,6 +103,8 @@ export default function WelcomePage() {
           id: user?.id,
           full_name: userProfile.full_name,
           phone_number: userProfile.phone_number
+        }, {
+          onConflict: 'id'
         })
 
       if (error) throw error
@@ -148,7 +150,16 @@ export default function WelcomePage() {
         logoUrl = await uploadLogo(logoFile)
       }
 
-      const { error } = await supabase
+      console.log('Attempting to insert company with data:', {
+        name: companyInfo.name,
+        address: companyInfo.address,
+        website: companyInfo.website,
+        industry: companyInfo.industry,
+        logo_url: logoUrl,
+        owner_id: user?.id
+      })
+      
+      const { error, data } = await supabase
         .from('companies')
         .insert({
           name: companyInfo.name,
@@ -158,13 +169,35 @@ export default function WelcomePage() {
           logo_url: logoUrl,
           owner_id: user?.id
         })
+        .select()
 
-      if (error) throw error
+      console.log('Company insertion result - error:', error, 'data:', data)
+      
+      if (error) {
+        console.error('Company insertion failed:', error)
+        throw error
+      }
 
+      // Refresh onboarding status after completing company setup
+      console.log('Company created successfully, checking onboarding status...')
+      const newStatus = await checkOnboarding()
+      console.log('New onboarding status after company creation:', newStatus)
+      
       setStep(3)
+      
+      // Force context to refresh the onboarding status
+      setTimeout(async () => {
+        console.log('Force refreshing onboarding status...')
+        await checkOnboarding()
+      }, 1000)
+      
+      // Force redirect to dashboard with a flag to bypass protection temporarily
       setTimeout(() => {
-        router.push('/dashboard')
-      }, 2000)
+        console.log('Executing final redirect to dashboard...')
+        // Store a flag to indicate onboarding just completed
+        sessionStorage.setItem('onboarding_just_completed', 'true')
+        router.replace('/dashboard')
+      }, 2500)
     } catch (error: any) {
       setError(error.message)
     } finally {
@@ -233,7 +266,7 @@ export default function WelcomePage() {
                       required
                       value={userProfile.full_name}
                       onChange={(e) => setUserProfile({...userProfile, full_name: e.target.value})}
-                      className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="block w-full pl-10 pr-3 py-3 text-lg text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 transition-all duration-200"
                       placeholder="Enter your full name"
                     />
                   </div>
@@ -252,7 +285,7 @@ export default function WelcomePage() {
                       required
                       value={userProfile.phone_number}
                       onChange={(e) => setUserProfile({...userProfile, phone_number: e.target.value})}
-                      className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="block w-full pl-10 pr-3 py-3 text-lg text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 transition-all duration-200"
                       placeholder="Enter your phone number"
                     />
                   </div>
@@ -283,7 +316,7 @@ export default function WelcomePage() {
                       required
                       value={companyInfo.name}
                       onChange={(e) => setCompanyInfo({...companyInfo, name: e.target.value})}
-                      className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="block w-full pl-10 pr-3 py-3 text-lg text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 transition-all duration-200"
                       placeholder="Enter your company name"
                     />
                   </div>
@@ -301,7 +334,7 @@ export default function WelcomePage() {
                       required
                       value={companyInfo.address}
                       onChange={(e) => setCompanyInfo({...companyInfo, address: e.target.value})}
-                      className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                      className="block w-full pl-10 pr-3 py-3 text-lg text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 transition-all duration-200 resize-none"
                       placeholder="Enter your company address"
                       rows={3}
                     />
@@ -320,7 +353,7 @@ export default function WelcomePage() {
                       type="url"
                       value={companyInfo.website}
                       onChange={(e) => setCompanyInfo({...companyInfo, website: e.target.value})}
-                      className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="block w-full pl-10 pr-3 py-3 text-lg text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 transition-all duration-200"
                       placeholder="https://www.yourcompany.com"
                     />
                   </div>
@@ -338,7 +371,7 @@ export default function WelcomePage() {
                       required
                       value={companyInfo.industry}
                       onChange={(e) => setCompanyInfo({...companyInfo, industry: e.target.value})}
-                      className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                      className="block w-full pl-10 pr-3 py-3 text-lg text-gray-900 border border-gray-300 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                     >
                       <option value="">Select your industry</option>
                       {industries.map((industry) => (

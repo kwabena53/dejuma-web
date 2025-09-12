@@ -6,7 +6,8 @@
       "WebFetch(domain:my.cowrywise.com)",
       "Bash(npm run dev:*)",
       "Bash(npm install:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(npx supabase:*)"
     ],
     "deny": [],
     "ask": []
