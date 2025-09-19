@@ -1,0 +1,49 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e4]:
+    - navigation [ref=e5]:
+      - generic [ref=e6]:
+        - img [ref=e8]
+        - generic [ref=e12]: HandyPro
+      - generic [ref=e13]:
+        - link "Sign in" [ref=e14] [cursor=pointer]:
+          - /url: /login
+        - link "Get Started" [ref=e15] [cursor=pointer]:
+          - /url: /register
+    - main [ref=e16]:
+      - generic [ref=e17]:
+        - generic [ref=e18]:
+          - heading "Manage Your Handyman Business Like a Pro" [level=1] [ref=e19]:
+            - text: Manage Your Handyman Business
+            - generic [ref=e20]: Like a Pro
+          - paragraph [ref=e21]: Create professional invoices, send quotes, and manage jobs all in one place. Built specifically for handymen and small service businesses.
+          - generic [ref=e22]:
+            - link "Start Free Trial" [ref=e23] [cursor=pointer]:
+              - /url: /register
+              - text: Start Free Trial
+              - img [ref=e24] [cursor=pointer]
+            - link "Sign In" [ref=e26] [cursor=pointer]:
+              - /url: /login
+          - generic [ref=e28]:
+            - generic [ref=e29]:
+              - img [ref=e30]
+              - generic [ref=e33]: Professional Invoices
+            - generic [ref=e34]:
+              - img [ref=e35]
+              - generic [ref=e38]: Quick Quotes
+            - generic [ref=e39]:
+              - img [ref=e40]
+              - generic [ref=e43]: Job Management
+        - generic [ref=e46]:
+          - img [ref=e48]
+          - heading "Ready to get started?" [level=3] [ref=e52]
+          - paragraph [ref=e53]: Join thousands of handymen who trust HandyPro to manage their business.
+          - link "Create Free Account" [ref=e54] [cursor=pointer]:
+            - /url: /register
+          - paragraph [ref=e55]: No credit card required • Free 14-day trial
+  - button "Open Next.js Dev Tools" [ref=e61] [cursor=pointer]:
+    - img [ref=e62] [cursor=pointer]
+  - alert [ref=e65]
+```

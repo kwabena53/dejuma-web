@@ -50,14 +50,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     
     try {
-      console.log('Checking onboarding status for user:', user.id)
+      // Check if we have cached completion status
+      const cacheKey = `onboarding_complete_${user.id}`
+      const cachedComplete = localStorage.getItem(cacheKey)
+      
+      console.log('Checking onboarding status for user:', user.id, 'cached:', cachedComplete)
       const status = await checkOnboardingStatus(user.id)
       console.log('Onboarding status result:', status)
+      
+      // Cache completion status if onboarding is complete
+      if (status.isComplete && cachedComplete !== 'true') {
+        localStorage.setItem(cacheKey, 'true')
+        console.log('Cached onboarding completion status')
+      } else if (!status.isComplete && cachedComplete === 'true') {
+        // If status shows incomplete but we had it cached as complete, 
+        // there might be a temporary issue, so use cached status
+        console.log('Using cached completion status due to temporary inconsistency')
+        status.isComplete = true
+      }
+      
       setOnboardingStatus(status)
       console.log('Updated context onboarding status')
       return status
     } catch (error) {
       console.error('Error checking onboarding status:', error)
+      
+      // If there's an error but we have cached completion status, use it
+      if (user) {
+        const cacheKey = `onboarding_complete_${user.id}`
+        const cachedComplete = localStorage.getItem(cacheKey)
+        if (cachedComplete === 'true') {
+          console.log('Using cached onboarding status due to error')
+          const fallbackStatus = { hasProfile: true, hasCompany: true, isComplete: true }
+          setOnboardingStatus(fallbackStatus)
+          return fallbackStatus
+        }
+      }
+      
       return null
     }
   }
@@ -70,6 +99,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Check onboarding status if user exists
       if (session?.user) {
+        // First check cache for immediate load
+        const cacheKey = `onboarding_complete_${session.user.id}`
+        const cachedComplete = localStorage.getItem(cacheKey)
+        
+        if (cachedComplete === 'true') {
+          console.log('Loading cached onboarding status on initial load')
+          setOnboardingStatus({ hasProfile: true, hasCompany: true, isComplete: true })
+        }
+        
+        // Then fetch fresh status
         await checkOnboardingStatus(session.user.id).then(setOnboardingStatus)
       }
       
@@ -83,8 +122,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(session)
         setUser(session?.user ?? null)
         
-        // Check onboarding status if user exists, but add a small delay to avoid race conditions
+        // Check onboarding status if user exists
         if (session?.user) {
+          // First check cache for immediate load
+          const cacheKey = `onboarding_complete_${session.user.id}`
+          const cachedComplete = localStorage.getItem(cacheKey)
+          
+          if (cachedComplete === 'true') {
+            console.log('Loading cached onboarding status on auth change')
+            setOnboardingStatus({ hasProfile: true, hasCompany: true, isComplete: true })
+          }
+          
+          // Then fetch fresh status (with small delay to avoid race conditions)
           setTimeout(async () => {
             const status = await checkOnboardingStatus(session.user.id)
             setOnboardingStatus(status)

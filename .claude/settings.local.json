@@ -7,7 +7,11 @@
       "Bash(npm run dev:*)",
       "Bash(npm install:*)",
       "Bash(npm uninstall:*)",
-      "Bash(npx supabase:*)"
+      "Bash(npx supabase:*)",
+      "Bash(curl:*)",
+      "Bash(node:*)",
+      "Bash(psql:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

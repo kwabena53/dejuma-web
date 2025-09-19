@@ -2,8 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/contexts/ToastContext'
 import { supabase } from '@/lib/supabase'
+import ProtectedRoute from '@/components/ProtectedRoute'
+import Sidebar from '@/components/Sidebar'
 import { User, Building2, Phone, Mail, MapPin, CheckCircle, ArrowLeft } from 'lucide-react'
 
 interface ClientData {
@@ -26,9 +30,9 @@ export default function AddClientPage() {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
   const [userCompany, setUserCompany] = useState<any>(null)
   const { user } = useAuth()
+  const { showSuccess, showError } = useToast()
   const router = useRouter()
 
   useEffect(() => {
@@ -37,17 +41,20 @@ export default function AddClientPage() {
       return
     }
 
-    // Get user's company
+    // Get user's company (use limit(1) instead of single() to handle multiple companies)
     const fetchUserCompany = async () => {
-      const { data: company } = await supabase
+      const { data: companies, error } = await supabase
         .from('companies')
         .select('id, name')
         .eq('owner_id', user.id)
-        .single()
+        .limit(1)
+      
+      const company = companies && companies.length > 0 ? companies[0] : null
       
       if (company) {
         setUserCompany(company)
       } else {
+        console.error('No company found for user:', error)
         // User doesn't have a company set up
         router.push('/welcome')
       }
@@ -80,67 +87,51 @@ export default function AddClientPage() {
 
       if (error) throw error
 
-      setSuccess(true)
-      setTimeout(() => {
-        router.push('/dashboard') // or wherever you want to redirect after success
-      }, 2000)
+      showSuccess(`Client ${clientData.first_name} ${clientData.last_name} added successfully!`)
+      router.push('/clients')
     } catch (error: any) {
+      showError(`Failed to add client: ${error.message}`)
       setError(error.message)
     } finally {
       setLoading(false)
     }
   }
 
-  if (success) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full">
-          <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 p-10 text-center">
-            <div className="flex justify-center mb-6">
-              <div className="bg-green-100 p-4 rounded-2xl">
-                <CheckCircle className="h-12 w-12 text-green-600" />
-              </div>
-            </div>
-            <h2 className="text-2xl font-display font-bold text-gray-900 mb-4">Client Added Successfully!</h2>
-            <p className="text-gray-600 mb-6">
-              {clientData.first_name} {clientData.last_name} has been added to your client list.
-            </p>
-            <div className="animate-pulse">
-              <div className="h-2 bg-blue-600 rounded-full"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center p-4">
-      <div className="max-w-2xl w-full">
-        <div className="flex items-center mb-6">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center text-gray-600 hover:text-gray-800 transition-colors"
-          >
-            <ArrowLeft className="h-5 w-5 mr-2" />
-            Back
-          </button>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
-          <div className="px-10 py-8 border-b border-gray-100">
-            <h1 className="text-3xl font-display font-bold text-gray-900 mb-2">Add New Client</h1>
-            <p className="text-lg text-gray-600">Enter client information to add them to your system</p>
+    <ProtectedRoute>
+      <div className="flex h-screen bg-gray-50">
+        <Sidebar />
+        
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Header */}
+          <div className="bg-white border-b border-gray-200 px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Add New Client</h1>
+                <p className="text-gray-600 mt-1">Enter client information to add them to your system</p>
+              </div>
+              <Link
+                href="/clients"
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Clients
+              </Link>
+            </div>
           </div>
 
-          <div className="p-10">
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl mb-6">
-                {error}
-              </div>
-            )}
+          {/* Content */}
+          <div className="flex-1 overflow-auto">
+            <div className="max-w-4xl mx-auto px-6 py-6">
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-6">
+                  {error}
+                </div>
+              )}
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
+                <form onSubmit={handleSubmit} className="space-y-6">
               {/* Personal Information */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -283,10 +274,12 @@ export default function AddClientPage() {
                   )}
                 </button>
               </div>
-            </form>
+                </form>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </ProtectedRoute>
   )
 }

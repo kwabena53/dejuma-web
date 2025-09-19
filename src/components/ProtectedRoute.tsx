@@ -26,24 +26,30 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
       return
     }
     
-    // If onboarding was just completed, clear the flag and allow access to dashboard
-    if (onboardingJustCompleted && currentPath === '/dashboard') {
-      console.log('Onboarding just completed, allowing access to dashboard')
+    // If onboarding was just completed, clear the flag and allow access
+    if (onboardingJustCompleted) {
+      console.log('Onboarding just completed, allowing access and clearing flag')
       sessionStorage.removeItem('onboarding_just_completed')
       return
     }
     
-    if (!loading && user && onboardingStatus && !onboardingStatus.isComplete && !onboardingJustCompleted) {
-      // If user is authenticated but hasn't completed onboarding, redirect to welcome
-      const redirectPath = getRedirectPath(onboardingStatus)
-      console.log('User onboarding incomplete - current path:', currentPath, 'redirect path:', redirectPath)
-      
-      if (currentPath !== redirectPath) {
-        console.log('Redirecting from', currentPath, 'to', redirectPath)
-        router.push(redirectPath)
+    // IMPORTANT: Only redirect if we have a definitive onboarding status
+    // If onboardingStatus is null, it might still be loading, so don't redirect yet
+    if (!loading && user && onboardingStatus !== null) {
+      if (!onboardingStatus.isComplete) {
+        // User hasn't completed onboarding, redirect to welcome
+        const redirectPath = getRedirectPath(onboardingStatus)
+        console.log('User onboarding incomplete - current path:', currentPath, 'redirect path:', redirectPath)
+        
+        if (currentPath !== redirectPath) {
+          console.log('Redirecting from', currentPath, 'to', redirectPath)
+          router.push(redirectPath)
+        }
+      } else {
+        console.log('User onboarding is complete, allowing access to protected route')
       }
-    } else if (!loading && user && onboardingStatus && onboardingStatus.isComplete) {
-      console.log('User onboarding is complete, allowing access to protected route')
+    } else if (!loading && user && onboardingStatus === null) {
+      console.log('Onboarding status is null (likely loading), waiting before making redirect decision')
     }
   }, [user, loading, onboardingStatus, router])
 

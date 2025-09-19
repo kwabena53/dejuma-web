@@ -113,7 +113,7 @@ export default function Home() {
                     >
                       Create Free Account
                     </Link>
-                    <p className="text-xs text-gray-500 mt-4">
+                    <p className="text-xs text-gray-600 mt-4">
                       No credit card required • Free 14-day trial
                     </p>
                   </div>
